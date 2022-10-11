@@ -32,7 +32,6 @@ import io.questdb.cairo.sql.Record;
 import io.questdb.cairo.sql.*;
 import io.questdb.cairo.vm.Vm;
 import io.questdb.cairo.vm.api.MemoryMARW;
-import io.questdb.cairo.TableWriterAPI;
 import io.questdb.cutlass.text.*;
 import io.questdb.griffin.engine.functions.catalogue.*;
 import io.questdb.griffin.engine.ops.AlterOperationBuilder;
@@ -140,7 +139,7 @@ public class SqlCompiler implements Closeable {
                 functionFactoryCache != null
                         ? functionFactoryCache
                         : new FunctionFactoryCache(engine.getConfiguration(), ServiceLoader.load(
-                        FunctionFactory.class, FunctionFactory.class.getClassLoader()))
+                                FunctionFactory.class, FunctionFactory.class.getClassLoader()))
         );
         this.codeGenerator = new SqlCodeGenerator(engine, configuration, functionParser, sqlNodePool);
         this.vacuumColumnVersions = new VacuumColumnVersions(engine);

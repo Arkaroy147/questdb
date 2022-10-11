@@ -28,6 +28,7 @@ import io.questdb.cairo.CairoConfiguration;
 import io.questdb.cairo.CairoEngine;
 import io.questdb.cairo.CairoException;
 import io.questdb.cairo.TableStructure;
+import io.questdb.cairo.pool.PoolListener;
 import io.questdb.cairo.pool.ex.PoolClosedException;
 import io.questdb.cairo.wal.WalWriter;
 import io.questdb.griffin.engine.ops.AlterOperation;
@@ -58,6 +59,7 @@ public class TableSequencerAPI implements Closeable {
     private final long inactiveTtlUs;
     private final int recreateDistressedSequencerAttempts;
     private volatile boolean closed;
+    private PoolListener poolListener;
 
     public TableSequencerAPI(CairoEngine engine, CairoConfiguration configuration) {
         this.configuration = configuration;
@@ -72,6 +74,11 @@ public class TableSequencerAPI implements Closeable {
     public void close() {
         closed = true;
         releaseAll();
+    }
+
+    public void setPoolListener(PoolListener eventListener) {
+        this.poolListener = eventListener;
+        walRegistry.forEach((tableName, pool) -> pool.setEventListener(eventListener));
     }
 
     public void copyMetadataTo(final CharSequence tableName, final SequencerMetadata metadata) {
@@ -260,7 +267,8 @@ public class TableSequencerAPI implements Closeable {
         return isWalTable(tableName, path, ff);
     }
 
-    private static boolean isWalTable(final CharSequence tableName, final Path root, final FilesFacade ff) {
+    // kept visible for tests
+    public static boolean isWalTable(final CharSequence tableName, final Path root, final FilesFacade ff) {
         root.concat(tableName).concat(SEQ_DIR);
         return ff.exists(root.$());
     }
@@ -286,7 +294,7 @@ public class TableSequencerAPI implements Closeable {
     }
 
     private WalWriterPool createWalPool(CharSequence charSequence) {
-        return new WalWriterPool((String) charSequence, this, engine.getConfiguration());
+        return new WalWriterPool((String) charSequence, this, engine.getConfiguration(), poolListener);
     }
 
     @NotNull
@@ -453,12 +461,25 @@ public class TableSequencerAPI implements Closeable {
         private final String tableName;
         private final TableSequencerAPI tableSequencerAPI;
         private final CairoConfiguration configuration;
+        private PoolListener eventListener;
         private volatile boolean closed;
 
-        public WalWriterPool(String tableName, TableSequencerAPI tableSequencerAPI, CairoConfiguration configuration) {
+        public WalWriterPool(String tableName, TableSequencerAPI tableSequencerAPI, CairoConfiguration configuration, PoolListener eventListener) {
             this.tableName = tableName;
             this.tableSequencerAPI = tableSequencerAPI;
             this.configuration = configuration;
+            this.eventListener = eventListener;
+            notifyListener(Thread.currentThread().getId(), null, PoolListener.EV_POOL_OPEN);
+        }
+
+        public void setEventListener(PoolListener eventListener) {
+            this.eventListener = eventListener;
+        }
+
+        private void notifyListener(long thread, CharSequence name, short event) {
+            if (eventListener != null) {
+                eventListener.onEvent(PoolListener.SRC_WRITER, thread, name, event, (short) 0, (short) 0);
+            }
         }
 
         public Entry get() {
@@ -470,6 +491,7 @@ public class TableSequencerAPI implements Closeable {
 
                     if (obj == null) {
                         obj = new Entry(tableName, tableSequencerAPI, configuration, this);
+                        notifyListener(Thread.currentThread().getId(), tableName, PoolListener.EV_CREATE);
                     } else {
                         if (!obj.goActive()) {
                             obj = Misc.free(obj);
@@ -503,6 +525,7 @@ public class TableSequencerAPI implements Closeable {
                     }
                     cache.push(obj);
                     obj.releaseTime = configuration.getMicrosecondClock().getTicks();
+                    notifyListener(Thread.currentThread().getId(), tableName, PoolListener.EV_RETURN);
                     return true;
                 }
             } finally {

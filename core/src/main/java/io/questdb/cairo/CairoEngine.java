@@ -145,7 +145,7 @@ public class CairoEngine implements Closeable, WriterSource, WalWriterSource {
             } else if (cursor == -1L) {
                 LOG.info().$("cannot publish WAL notifications, queue is full [current=")
                         .$(pubSeq.current()).$(", table=").$(tableName)
-                        .$();
+                        .I$();
                 // queue overflow, throw away notification and notify a job to rescan all tables
                 notifyWalTxnRepublisher();
                 return;
@@ -336,6 +336,7 @@ public class CairoEngine implements Closeable, WriterSource, WalWriterSource {
     public void setPoolListener(PoolListener poolListener) {
         this.writerPool.setPoolListener(poolListener);
         this.readerPool.setPoolListener(poolListener);
+        this.tableSequencerAPI.setPoolListener(poolListener);
     }
 
     public TableReader getReader(

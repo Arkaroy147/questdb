@@ -43,7 +43,7 @@ public class SequencerMetadata extends BaseRecordMetadata implements TableRecord
     private final MemoryMARW metaMem;
     private final MemoryMR roMetaMem;
 
-    private long structureVersion = -1;
+    private volatile long structureVersion = -1;
     private int tableId;
     private String tableName;
     private volatile boolean suspended;

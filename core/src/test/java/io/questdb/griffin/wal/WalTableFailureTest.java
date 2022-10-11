@@ -262,7 +262,7 @@ public class WalTableFailureTest extends AbstractGriffinTest {
                     insertWriter.commit();
                     Assert.fail();
                 } catch (CairoException e) {
-                    TestUtils.assertContains(e.getFlyweightMessage(), "could not apply table definition changes to the current transaction. Invalid column: non_existing_column");
+                    TestUtils.assertContains(e.getFlyweightMessage(), "could not apply table definition changes to the current transaction. invalid column: non_existing_column");
                 }
             } finally {
                 Misc.free(alterOperation);
@@ -338,7 +338,7 @@ public class WalTableFailureTest extends AbstractGriffinTest {
                     insertWriter.commit();
                     Assert.fail();
                 } catch (CairoException e) {
-                    TestUtils.assertContains(e.getFlyweightMessage(), "could not apply table definition changes to the current transaction. cannot rename column \"x\", errno=");
+                    TestUtils.assertContains(e.getFlyweightMessage(), "could not apply table definition changes to the current transaction. [2] cannot rename WAL column file");
                 }
 
             } finally {
@@ -800,8 +800,8 @@ public class WalTableFailureTest extends AbstractGriffinTest {
             try {
                 compile("alter table " + tableName + " add column jjj int, column2 long");
                 Assert.fail();
-            } catch (CairoException ex) {
-                TestUtils.assertContains(ex.getFlyweightMessage(), "table structure change did not contain 1 transaction");
+            } catch (SqlException ex) {
+                TestUtils.assertContains(ex.getFlyweightMessage(), "table structure change does not contain 1 transaction");
             }
 
             executeInsert("insert into " + tableName +
@@ -833,7 +833,6 @@ public class WalTableFailureTest extends AbstractGriffinTest {
                 drainWalQueue();
 
                 try (TableWriterAPI alterWriter2 = engine.getTableWriterAPI(sqlExecutionContext.getCairoSecurityContext(), tableName, "test")) {
-
                     try {
                         alterWriter2.apply(alterOperation, true);
                         Assert.fail();
@@ -919,7 +918,7 @@ public class WalTableFailureTest extends AbstractGriffinTest {
                 try {
                     insertMethod.commit();
                 } catch (CairoException e) {
-                    TestUtils.assertContains(e.getFlyweightMessage(), "could not add column [error=failed to copy column file to new segment");
+                    TestUtils.assertContains(e.getFlyweightMessage(), "could not apply table definition changes to the current transaction. [2] failed to copy column file to new segment");
                 }
             }
 
